@@ -4,9 +4,43 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { logActivity } = require('../utils/audit');
+const { authenticate } = require('../middleware/auth');
+const { sendPasswordResetEmail } = require('../utils/email');
 require('dotenv').config();
 
 const router = express.Router();
+
+// GET /api/auth/me - Verify current session
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT u.user_id, u.full_name, u.username, u.email, u.status, u.role_id, u.department_id, r.role_name
+       FROM users u
+       JOIN roles r ON u.role_id = r.role_id
+       WHERE u.user_id = ?`,
+      [req.user.user_id]
+    );
+
+    if (rows.length === 0 || rows[0].status !== 'active') {
+      return res.status(401).json({ error: 'User account not found or deactivated.' });
+    }
+
+    const user = rows[0];
+    res.json({
+      user: {
+        user_id: user.user_id,
+        full_name: user.full_name,
+        username: user.username,
+        email: user.email,
+        role_name: user.role_name,
+        department_id: user.department_id
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error while verifying session.' });
+  }
+});
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -120,11 +154,17 @@ router.post('/forgot-password', async (req, res) => {
 
     await logActivity(user.user_id, 'FORGOT_PASSWORD', `Reset requested for ${user.username}`);
 
-    const resetLink = `${req.headers.origin || 'http://localhost:5173'}/reset-password?token=${token}`;
+    const resetLink = `${req.headers.origin || 'http://localhost:3000'}/reset-password?token=${token}`;
+
+    sendPasswordResetEmail({
+      userEmail: email,
+      userName: user.username,
+      resetLink
+    }).catch(err => console.error('[Email Notification Error]:', err.message));
 
     res.json({
-      message: 'If that email is registered, a reset link has been generated.',
-      resetLink // shown in the UI for this prototype in place of an actual email
+      message: 'If that email is registered, a reset link has been generated and sent.',
+      resetLink // also provided for convenience in preview
     });
   } catch (err) {
     console.error(err);

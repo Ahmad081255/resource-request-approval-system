@@ -1,0 +1,8 @@
+{
+  "name": "Ledger & Desk Resource Request System",
+  "description": "Resource Request and Approval Management System (RRAM) with role-based access control, approval workflow, catalogued resources, and audit trail.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

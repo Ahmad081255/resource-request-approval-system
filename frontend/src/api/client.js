@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 async function request(path, { method = 'GET', body, token } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -16,6 +16,12 @@ async function request(path, { method = 'GET', body, token } = {}) {
     data = await res.json();
   } catch {
     data = null;
+  }
+
+  if (res.status === 401 && !path.startsWith('/auth/login') && !path.startsWith('/auth/register')) {
+    localStorage.removeItem('rram_token');
+    localStorage.removeItem('rram_user');
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
   }
 
   if (!res.ok) {

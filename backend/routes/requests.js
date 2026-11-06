@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
 const { logActivity } = require('../utils/audit');
+const { sendNewRequestEmail, sendRequestDecisionEmail } = require('../utils/email');
 
 const router = express.Router();
 router.use(authenticate);
@@ -74,16 +75,30 @@ router.post('/', authorize('Staff', 'Manager', 'Administrator'), async (req, res
       [req.user.user_id, resource_type, resource_id || null, quantity, purpose]
     );
 
-    // Notify all managers/administrators of the new request
+    // Notify all managers/administrators of the new request (in-app + email)
     const [approvers] = await pool.query(
-      `SELECT u.user_id FROM users u JOIN roles r ON u.role_id = r.role_id
+      `SELECT u.user_id, u.full_name, u.email FROM users u JOIN roles r ON u.role_id = r.role_id
        WHERE r.role_name IN ('Manager', 'Administrator') AND u.status = 'active'`
     );
+    const appUrl = `${req.protocol}://${req.get('host')}`;
     for (const a of approvers) {
       await pool.query(
         `INSERT INTO notifications (user_id, request_id, type, message) VALUES (?, ?, 'request_submitted', ?)`,
         [a.user_id, result.insertId, `${req.user.full_name} submitted a new request for ${resource_type}.`]
       );
+
+      if (a.email) {
+        sendNewRequestEmail({
+          approverEmail: a.email,
+          approverName: a.full_name,
+          requesterName: req.user.full_name,
+          resourceType,
+          quantity,
+          purpose,
+          requestId: result.insertId,
+          appUrl
+        }).catch(err => console.error('[Email Notification Error]:', err.message));
+      }
     }
 
     await logActivity(req.user.user_id, 'SUBMIT_REQUEST', `Requested ${quantity} x ${resource_type}`);
@@ -103,7 +118,13 @@ router.patch('/:id/decision', authorize('Manager', 'Administrator'), async (req,
   }
 
   try {
-    const [reqRows] = await pool.query('SELECT * FROM requests WHERE request_id = ?', [req.params.id]);
+    const [reqRows] = await pool.query(
+      `SELECT rq.*, u.full_name AS requester_name, u.email AS requester_email
+       FROM requests rq
+       JOIN users u ON rq.user_id = u.user_id
+       WHERE rq.request_id = ?`,
+      [req.params.id]
+    );
     if (reqRows.length === 0) return res.status(404).json({ error: 'Request not found.' });
     const request = reqRows[0];
 
@@ -119,6 +140,22 @@ router.patch('/:id/decision', authorize('Manager', 'Administrator'), async (req,
       `INSERT INTO notifications (user_id, request_id, type, message) VALUES (?, ?, 'decision', ?)`,
       [request.user_id, req.params.id, `Your request for ${request.resource_type} was ${label} by ${req.user.full_name}.`]
     );
+
+    // Send email notification to requester
+    if (request.requester_email) {
+      const appUrl = `${req.protocol}://${req.get('host')}`;
+      sendRequestDecisionEmail({
+        requesterEmail: request.requester_email,
+        requesterName: request.requester_name,
+        resourceType: request.resource_type,
+        quantity: request.quantity,
+        decision,
+        remarks,
+        approverName: req.user.full_name,
+        requestId: req.params.id,
+        appUrl
+      }).catch(err => console.error('[Email Notification Error]:', err.message));
+    }
 
     await logActivity(req.user.user_id, 'REQUEST_DECISION', `Request #${req.params.id} marked ${decision}`);
 
