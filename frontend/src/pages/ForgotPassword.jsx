@@ -42,11 +42,11 @@ export default function ForgotPassword() {
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center px-4">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none mb-4">
-          <KeyRound className="w-7 h-7" />
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#0b2038] border border-slate-700/50 shadow-md p-1.5 mb-4">
+          <img src="/logo.jpg" alt="RRAM Logo" className="w-full h-full object-contain rounded-lg" />
         </div>
         <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Reset Password</h1>
-        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">We'll help you recover your access</p>
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">RRAM · Recover your account access</p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">

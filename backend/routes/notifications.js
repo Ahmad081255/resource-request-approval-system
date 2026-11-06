@@ -30,13 +30,13 @@ router.post('/test-email', async (req, res) => {
   const recipient = req.body.email || req.user.email || 'user@example.com';
   const result = await sendNotificationEmail({
     to: recipient,
-    subject: `[Ledger&Desk] Test Email Notification for ${req.user.full_name}`,
-    text: `Hello ${req.user.full_name}, this is a test notification verifying that email delivery is active in Ledger&Desk.`,
+    subject: `[RRAM] Test Email Notification for ${req.user.full_name}`,
+    text: `Hello ${req.user.full_name}, this is a test notification verifying that email delivery is active in RRAM.`,
     html: `
       <div style="font-family: sans-serif; padding: 20px; background: #f8fafc; border-radius: 8px;">
         <h2 style="color: #4f46e5; margin-top: 0;">Test Notification Successful</h2>
         <p>Hello <strong>${req.user.full_name}</strong>,</p>
-        <p>This email confirms that your Ledger&Desk email notification service is active and functioning properly.</p>
+        <p>This email confirms that your RRAM email notification service is active and functioning properly.</p>
         <p style="font-size: 12px; color: #64748b;">Sent at ${new Date().toLocaleString()}</p>
       </div>
     `

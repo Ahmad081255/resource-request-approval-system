@@ -72,11 +72,11 @@ export default function Layout({ children }) {
       {/* Mobile Top Navigation Header */}
       <header id="mobile-header" className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-xs">
-            L&D
+          <div className="w-9 h-9 rounded-xl bg-[#0b2038] border border-slate-700/50 flex items-center justify-center overflow-hidden shrink-0 p-1 shadow-xs">
+            <img src="/logo.jpg" alt="RRAM Logo" className="w-full h-full object-contain" />
           </div>
           <div>
-            <div className="font-bold text-slate-900 dark:text-white text-sm leading-tight">Ledger & Desk</div>
+            <div className="font-bold text-slate-900 dark:text-white text-base leading-tight tracking-tight">RRAM</div>
             <div className="text-[10px] uppercase font-mono tracking-wider text-slate-500 dark:text-slate-400">Resource Requests</div>
           </div>
         </div>
@@ -112,14 +112,14 @@ export default function Layout({ children }) {
         } md:flex flex-col w-full md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200/90 dark:border-slate-800 shrink-0 md:sticky md:top-0 md:h-screen z-30 transition-all`}
       >
         {/* Brand Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-linear-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-bold text-base shadow-sm shadow-indigo-100 dark:shadow-none">
-              <Briefcase className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-[#0b2038] border border-slate-700/50 flex items-center justify-center overflow-hidden shrink-0 shadow-sm p-1">
+              <img src="/logo.jpg" alt="RRAM Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <div className="font-bold text-slate-900 dark:text-white text-base tracking-tight leading-none">Ledger&Desk</div>
-              <div className="text-[11px] uppercase font-mono tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">
+              <div className="font-bold text-slate-900 dark:text-white text-lg tracking-tight leading-none">RRAM</div>
+              <div className="text-[11px] uppercase font-mono tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
                 Resource Portal
               </div>
             </div>

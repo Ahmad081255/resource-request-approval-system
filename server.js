@@ -20,7 +20,7 @@ async function startServer() {
   app.use(express.json());
 
   // API Health & Routes
-  app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'Ledger&Desk RRAM System API' }));
+  app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'RRAM System API' }));
 
   app.use('/api/auth', authRoutes);
   app.use('/api/requests', requestRoutes);
@@ -35,6 +35,10 @@ async function startServer() {
     console.error('[API Error]:', err);
     res.status(500).json({ error: 'Something went wrong on the server.' });
   });
+
+  // Serve static assets from public folders
+  app.use('/public', express.static(path.resolve(__dirname, 'public')));
+  app.use(express.static(path.resolve(__dirname, 'frontend', 'public')));
 
   // Frontend Integration (Vite Middleware in dev / Static dist in production)
   const isProduction = process.env.NODE_ENV === 'production';
@@ -66,7 +70,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Ledger&Desk server running on http://0.0.0.0:${PORT}`);
+    console.log(`RRAM server running on http://0.0.0.0:${PORT}`);
   });
 }
 

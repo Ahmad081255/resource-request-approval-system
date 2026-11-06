@@ -69,7 +69,7 @@ export default function Reports() {
   function downloadSummaryCSV() {
     if (!summary) return;
     const now = new Date().toISOString();
-    let csv = `LEDGER & DESK - EXECUTIVE RESOURCE MANAGEMENT REPORT\nGenerated At,${now}\nTotal Requests Logged,${summary.total || 0}\n\n`;
+    let csv = `RRAM - EXECUTIVE RESOURCE MANAGEMENT REPORT\nGenerated At,${now}\nTotal Requests Logged,${summary.total || 0}\n\n`;
 
     csv += `STATUS BREAKDOWN\nStatus,Count,Percentage\n`;
     const totalVolume = summary.statusCounts.reduce((acc, curr) => acc + curr.count, 0) || 1;
@@ -114,7 +114,7 @@ export default function Reports() {
   function downloadJSONReport() {
     if (!summary) return;
     const payload = {
-      report_title: 'Ledger & Desk Resource Requisitions Summary',
+      report_title: 'RRAM Resource Requisitions Summary',
       generated_at: new Date().toISOString(),
       summary,
       detailed_requests: requests

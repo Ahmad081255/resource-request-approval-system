@@ -47,7 +47,7 @@ async function sendNotificationEmail({ to, subject, html, text }) {
   }
 
   const transport = getTransporter();
-  const from = process.env.EMAIL_FROM || '"Ledger&Desk Notifications" <no-reply@ledgeranddesk.com>';
+  const from = process.env.EMAIL_FROM || '"RRAM Notifications" <no-reply@rram-portal.com>';
 
   const mailOptions = {
     from,
@@ -90,7 +90,7 @@ async function sendNotificationEmail({ to, subject, html, text }) {
  * Notification Email 1: New request submitted (sent to Managers & Administrators)
  */
 async function sendNewRequestEmail({ approverEmail, approverName, requesterName, resourceType, quantity, purpose, requestId, appUrl }) {
-  const subject = `[Ledger&Desk] New Request #${requestId}: ${quantity} x ${resourceType} by ${requesterName}`;
+  const subject = `[RRAM] New Request #${requestId}: ${quantity} x ${resourceType} by ${requesterName}`;
   const actionUrl = `${appUrl || 'http://localhost:3000'}/requests`;
 
   const html = `
@@ -101,7 +101,7 @@ async function sendNewRequestEmail({ approverEmail, approverName, requesterName,
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
         .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
-        .header { background: #4f46e5; padding: 24px; color: #ffffff; }
+        .header { background: #0b2038; padding: 24px; color: #ffffff; }
         .header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
         .header p { margin: 4px 0 0 0; font-size: 13px; opacity: 0.9; }
         .body { padding: 24px; }
@@ -117,7 +117,7 @@ async function sendNewRequestEmail({ approverEmail, approverName, requesterName,
       <div class="container">
         <div class="header">
           <h1>New Resource Request Submitted</h1>
-          <p>Ledger&Desk Resource Request & Approval Management</p>
+          <p>RRAM · Resource Request & Approval Management</p>
         </div>
         <div class="body">
           <p style="font-size: 14px; margin-top: 0;">Hello ${approverName || 'Approver'},</p>
@@ -136,10 +136,10 @@ async function sendNewRequestEmail({ approverEmail, approverName, requesterName,
             <div class="purpose-box">${purpose}</div>
           </div>
 
-          <a href="${actionUrl}" class="cta">Review & Decide in Ledger&Desk</a>
+          <a href="${actionUrl}" class="cta">Review & Decide in RRAM</a>
         </div>
         <div class="footer">
-          This is an automated notification from Ledger&Desk RRAM System.
+          This is an automated notification from RRAM System.
         </div>
       </div>
     </body>
@@ -163,7 +163,7 @@ async function sendRequestDecisionEmail({ requesterEmail, requesterName, resourc
   const statusLabel = isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Modification Requested';
   const themeColor = isApproved ? '#16a34a' : isRejected ? '#dc2626' : '#d97706';
 
-  const subject = `[Ledger&Desk] Request #${requestId} for ${resourceType} was ${statusLabel}`;
+  const subject = `[RRAM] Request #${requestId} for ${resourceType} was ${statusLabel}`;
   const actionUrl = `${appUrl || 'http://localhost:3000'}/requests`;
 
   const html = `
@@ -191,7 +191,7 @@ async function sendRequestDecisionEmail({ requesterEmail, requesterName, resourc
       <div class="container">
         <div class="header">
           <h1>Request Status Update: ${statusLabel}</h1>
-          <p>Ledger&Desk Resource Request & Approval Management</p>
+          <p>RRAM · Resource Request & Approval Management</p>
         </div>
         <div class="body">
           <p style="font-size: 14px; margin-top: 0;">Hello ${requesterName || 'Staff Member'},</p>
@@ -214,7 +214,7 @@ async function sendRequestDecisionEmail({ requesterEmail, requesterName, resourc
           <a href="${actionUrl}" class="cta">View Request Details</a>
         </div>
         <div class="footer">
-          This is an automated notification from Ledger&Desk RRAM System.
+          This is an automated notification from RRAM System.
         </div>
       </div>
     </body>
@@ -233,7 +233,7 @@ async function sendRequestDecisionEmail({ requesterEmail, requesterName, resourc
  * Notification Email 3: Password reset link
  */
 async function sendPasswordResetEmail({ userEmail, userName, resetLink }) {
-  const subject = `[Ledger&Desk] Reset Your Password`;
+  const subject = `[RRAM] Reset Your Password`;
 
   const html = `
     <!DOCTYPE html>
@@ -243,7 +243,7 @@ async function sendPasswordResetEmail({ userEmail, userName, resetLink }) {
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
         .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
-        .header { background: #4f46e5; padding: 24px; color: #ffffff; }
+        .header { background: #0b2038; padding: 24px; color: #ffffff; }
         .header h1 { margin: 0; font-size: 18px; font-weight: 700; }
         .body { padding: 24px; }
         .cta { display: inline-block; background: #4f46e5; color: #ffffff !important; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-top: 14px; }
@@ -257,12 +257,12 @@ async function sendPasswordResetEmail({ userEmail, userName, resetLink }) {
         </div>
         <div class="body">
           <p style="font-size: 14px; margin-top: 0;">Hello ${userName || 'User'},</p>
-          <p style="font-size: 13px; color: #475569;">You requested a password reset for your Ledger&Desk account. Click the button below to set a new password. This link is valid for 1 hour.</p>
+          <p style="font-size: 13px; color: #475569;">You requested a password reset for your RRAM account. Click the button below to set a new password. This link is valid for 1 hour.</p>
           <a href="${resetLink}" class="cta">Reset Password</a>
           <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">If you didn't request this reset, you can safely ignore this email.</p>
         </div>
         <div class="footer">
-          Ledger&Desk RRAM System
+          RRAM System
         </div>
       </div>
     </body>
@@ -272,7 +272,7 @@ async function sendPasswordResetEmail({ userEmail, userName, resetLink }) {
   return sendNotificationEmail({
     to: userEmail,
     subject,
-    text: `Reset your Ledger&Desk password: ${resetLink}. Valid for 1 hour.`,
+    text: `Reset your RRAM password: ${resetLink}. Valid for 1 hour.`,
     html
   });
 }

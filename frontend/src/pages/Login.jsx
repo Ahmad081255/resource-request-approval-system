@@ -46,11 +46,11 @@ export default function Login() {
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center px-4">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none mb-4">
-          <Briefcase className="w-7 h-7" />
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[#0b2038] border border-slate-700/50 shadow-lg shadow-indigo-500/10 dark:shadow-none p-2 mb-4">
+          <img src="/logo.jpg" alt="RRAM Logo" className="w-full h-full object-contain rounded-lg" />
         </div>
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Ledger & Desk</h1>
-        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">Resource Request & Approval System</p>
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">RRAM</h1>
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">Resource Request & Approval Management</p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
