@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '.env'), override: true });
 
 const authRoutes = require('./backend/routes/auth');
 const requestRoutes = require('./backend/routes/requests');
@@ -11,6 +11,7 @@ const userRoutes = require('./backend/routes/users');
 const notificationRoutes = require('./backend/routes/notifications');
 const reportRoutes = require('./backend/routes/reports');
 const departmentRoutes = require('./backend/routes/departments');
+const { generateDocumentationPDF } = require('./backend/utils/pdfGenerator');
 
 async function startServer() {
   const app = express();
@@ -21,6 +22,22 @@ async function startServer() {
 
   // API Health & Routes
   app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'RRAM System API' }));
+  app.get('/api/documentation/markdown', (req, res) => {
+    const docPath = path.resolve(__dirname, 'DOCUMENTATION.md');
+    if (fs.existsSync(docPath)) {
+      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+      return fs.createReadStream(docPath).pipe(res);
+    }
+    res.status(404).send('# Documentation not found');
+  });
+  app.get('/api/documentation/pdf', (req, res) => {
+    try {
+      generateDocumentationPDF(res);
+    } catch (err) {
+      console.error('[PDF Generation Error]:', err);
+      res.status(500).json({ error: 'Failed to generate PDF documentation' });
+    }
+  });
 
   app.use('/api/auth', authRoutes);
   app.use('/api/requests', requestRoutes);

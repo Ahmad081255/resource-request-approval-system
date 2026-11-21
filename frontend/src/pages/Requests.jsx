@@ -8,11 +8,15 @@ export default function Requests() {
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
   const isStaff = user.role_name === 'Staff';
 
   useEffect(() => {
-    api.get('/requests').then(setRequests).finally(() => setLoading(false));
+    api.get('/requests')
+      .then(setRequests)
+      .catch((err) => setError(err.message || 'Failed to load requests.'))
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = filter === 'all' ? requests : requests.filter((r) => r.status === filter);
@@ -97,7 +101,7 @@ export default function Requests() {
             >
               <span>{f.label}</span>
               <span
-                className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
                   active ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                 }`}
               >
@@ -108,6 +112,12 @@ export default function Requests() {
         })}
       </div>
 
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 text-sm">
+          {error}
+        </div>
+      )}
+
       {/* Requests Table Card */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs overflow-hidden">
         {loading ? (
@@ -117,7 +127,7 @@ export default function Requests() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-16 text-center">
-            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-850 text-slate-400 flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-3">
               <Inbox className="w-6 h-6" />
             </div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">No requests found</h3>

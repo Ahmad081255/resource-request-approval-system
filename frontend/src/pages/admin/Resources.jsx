@@ -8,6 +8,8 @@ export default function AdminResources() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', quantity: 0, description: '', location: '' });
   const [error, setError] = useState('');
+  const [pageError, setPageError] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -39,14 +41,25 @@ export default function AdminResources() {
   }
 
   async function updateResource(res, changes) {
-    await api.put(`/resources/${res.resource_id}`, { ...res, ...changes });
-    load();
+    setPageError('');
+    try {
+      await api.put(`/resources/${res.resource_id}`, { ...res, ...changes });
+      load();
+    } catch (err) {
+      setPageError(err.message);
+    }
   }
 
   async function removeResource(id) {
-    if (!confirm('Remove this resource from the catalogue?')) return;
-    await api.del(`/resources/${id}`);
-    load();
+    setPageError('');
+    try {
+      await api.del(`/resources/${id}`);
+      setConfirmDeleteId(null);
+      load();
+    } catch (err) {
+      setConfirmDeleteId(null);
+      setPageError(err.message);
+    }
   }
 
   return (
@@ -76,6 +89,13 @@ export default function AdminResources() {
           <span>{showForm ? 'Cancel' : 'New Resource'}</span>
         </button>
       </div>
+
+      {pageError && (
+        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 text-sm flex items-start gap-2.5">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <span>{pageError}</span>
+        </div>
+      )}
 
       {/* New Resource Form */}
       {showForm && (
@@ -235,13 +255,30 @@ export default function AdminResources() {
                         >
                           {r.status === 'available' ? 'Mark Unavailable' : 'Mark Available'}
                         </button>
-                        <button
-                          onClick={() => removeResource(r.resource_id)}
-                          className="p-1.5 rounded-lg border border-rose-200 dark:border-rose-800/80 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                          title="Delete resource"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {confirmDeleteId === r.resource_id ? (
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={() => removeResource(r.resource_id)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors cursor-pointer"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="px-2 py-1 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteId(r.resource_id)}
+                            className="p-1.5 rounded-lg border border-rose-200 dark:border-rose-800/80 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                            title="Delete resource"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

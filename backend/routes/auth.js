@@ -148,7 +148,7 @@ router.post('/forgot-password', async (req, res) => {
     const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
     await pool.query(
-      'UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE user_id = ?',
+      'UPDATE users SET reset_token = ?, reset_expires = ? WHERE user_id = ?',
       [token, expires, user.user_id]
     );
 
@@ -184,7 +184,7 @@ router.post('/reset-password', async (req, res) => {
 
   try {
     const [rows] = await pool.query(
-      'SELECT user_id, username FROM users WHERE reset_token = ? AND reset_token_expires > NOW()',
+      'SELECT user_id, username FROM users WHERE reset_token = ? AND reset_expires > NOW()',
       [token]
     );
 
@@ -196,7 +196,7 @@ router.post('/reset-password', async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
 
     await pool.query(
-      'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE user_id = ?',
+      'UPDATE users SET password_hash = ?, reset_token = NULL, reset_expires = NULL WHERE user_id = ?',
       [password_hash, user.user_id]
     );
 

@@ -24,12 +24,32 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [dash, reqs] = await Promise.all([
+        const [dashResult, reqsResult] = await Promise.allSettled([
           api.get('/users/dashboard/stats'),
           api.get('/requests')
         ]);
-        setStats(dash);
+
+        const reqs = reqsResult.status === 'fulfilled' && Array.isArray(reqsResult.value)
+          ? reqsResult.value
+          : [];
         setRecent(reqs.slice(0, 5));
+
+        if (dashResult.status === 'fulfilled' && dashResult.value) {
+          setStats(dashResult.value);
+        } else {
+          // Fallback: derive counts directly from fetched requisitions
+          const fallback = {
+            pending: 0,
+            approved: 0,
+            modification_requested: 0,
+            rejected: 0,
+            byDepartment: []
+          };
+          for (const r of reqs) {
+            if (r.status in fallback) fallback[r.status] += 1;
+          }
+          setStats(fallback);
+        }
       } catch (err) {
         console.error(err);
       } finally {

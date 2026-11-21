@@ -20,7 +20,8 @@ import {
   Briefcase,
   Sun,
   Moon,
-  Sparkles
+  Sparkles,
+  BookOpen
 } from 'lucide-react';
 
 export default function Layout({ children }) {
@@ -64,6 +65,7 @@ export default function Layout({ children }) {
     if (p === '/admin/departments') return 'Admin · Departments';
     if (p === '/admin/resources') return 'Admin · Catalogue';
     if (p === '/admin/audit') return 'Admin · Audit Trail';
+    if (p === '/docs') return 'System Documentation';
     return 'Resource Management';
   }
 
@@ -147,6 +149,14 @@ export default function Layout({ children }) {
                   <>
                     <Bell className={iconClass(isActive)} />
                     <span>Notifications</span>
+                  </>
+                )}
+              </NavLink>
+              <NavLink to="/docs" className={linkClass} onClick={() => setMobileMenuOpen(false)}>
+                {({ isActive }) => (
+                  <>
+                    <BookOpen className={iconClass(isActive)} />
+                    <span>System Docs (PDF)</span>
                   </>
                 )}
               </NavLink>
@@ -298,6 +308,15 @@ export default function Layout({ children }) {
 
           {/* Right Header Controls: Dark Mode Toggle & Quick Actions */}
           <div className="flex items-center gap-3">
+            <NavLink
+              to="/docs"
+              id="top-docs-btn"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>Docs (PDF)</span>
+            </NavLink>
+
             {/* Theme Toggle Button */}
             <button
               id="theme-toggle-btn"

@@ -1,5 +1,6 @@
 const mysql = require('mysql2/promise');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), override: true });
 
 // Initial In-Memory Seed Data (Matches MySQL schema & project figures)
 const roles = [
@@ -668,19 +669,22 @@ const mockPool = {
   })
 };
 
-// If an external MySQL DB is explicitly configured, attempt to use it; otherwise use the reliable mock store
+const { initializeRemoteDatabase } = require('./schemaInit');
+
+// If an external MySQL/TiDB DB is explicitly configured, attempt to use it; otherwise use the reliable mock store
 let realPool = null;
 let useRealDb = false;
 
 const dbHost = process.env.DB_HOST || 'localhost';
 const isLocalhost = dbHost === 'localhost' || dbHost === '127.0.0.1';
+const isTiDB = dbHost.includes('tidbcloud.com') || Number(process.env.DB_PORT) === 4000;
 
 if (process.env.USE_REAL_MYSQL === 'true') {
   if (isLocalhost) {
     console.log('[Database] Notice: DB_HOST is set to localhost/127.0.0.1. Running in cloud container with the high-performance integrated MySQL schema store. To connect to an external MySQL server, provide a remote DB_HOST in your environment variables.');
   } else {
     try {
-      realPool = mysql.createPool({
+      const poolConfig = {
         host: dbHost,
         port: Number(process.env.DB_PORT) || 3306,
         user: process.env.DB_USER || 'root',
@@ -689,27 +693,41 @@ if (process.env.USE_REAL_MYSQL === 'true') {
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
-        connectTimeout: 4000
+        connectTimeout: 8000
+      };
+
+      if (isTiDB || process.env.DB_SSL === 'true') {
+        poolConfig.ssl = {
+          minVersion: 'TLSv1.2',
+          rejectUnauthorized: false
+        };
+      }
+
+      realPool = mysql.createPool(poolConfig);
+      console.log(`[Database] Initialized external database pool for ${dbHost}:${process.env.DB_PORT || 3306} (SSL: ${poolConfig.ssl ? 'active' : 'none'})`);
+
+      // Verify connection and ensure schema
+      var initPromise = realPool.query('SELECT 1').then(async () => {
+        console.log('[Database] Live connection verified to remote database host.');
+        await initializeRemoteDatabase(realPool);
+      }).catch(err => {
+        console.warn(`[Database Notice] Could not connect to remote host ${dbHost}: ${err.message}.`);
       });
-      useRealDb = true;
-      console.log(`[Database] Initialized external MySQL connection pool for ${dbHost}:${process.env.DB_PORT || 3306}`);
     } catch (err) {
-      console.warn('[Database] Failed to configure external MySQL pool:', err.message);
+      console.warn('[Database] Failed to configure external database pool:', err.message);
     }
   }
 }
 
-// Resilient wrapper: if realPool is active but encounters connection refused or network issues,
-// it gracefully falls back to mockPool so the application never crashes with ECONNREFUSED!
+// Resilient wrapper: routes to TiDB/MySQL whenever configured, with safety fallback on network interruption
 const resilientPool = {
   query: async (sql, params) => {
-    if (useRealDb && realPool) {
+    if (realPool && process.env.USE_REAL_MYSQL === 'true' && !isLocalhost) {
       try {
         return await realPool.query(sql, params);
       } catch (err) {
-        if (['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EHOSTUNREACH', 'ER_ACCESS_DENIED_ERROR', 'PROTOCOL_CONNECTION_LOST'].includes(err.code)) {
-          console.warn(`[Database Fallback] MySQL error (${err.code}: ${err.message}). Seamlessly serving request from integrated store.`);
-          useRealDb = false;
+        if (['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EHOSTUNREACH', 'PROTOCOL_CONNECTION_LOST'].includes(err.code)) {
+          console.warn(`[Database Warning] Network issue (${err.code}). Serving query from fallback store.`);
           return mockPool.query(sql, params);
         }
         throw err;
@@ -718,13 +736,12 @@ const resilientPool = {
     return mockPool.query(sql, params);
   },
   execute: async (sql, params) => {
-    if (useRealDb && realPool) {
+    if (realPool && process.env.USE_REAL_MYSQL === 'true' && !isLocalhost) {
       try {
         return await realPool.execute(sql, params);
       } catch (err) {
-        if (['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EHOSTUNREACH', 'ER_ACCESS_DENIED_ERROR', 'PROTOCOL_CONNECTION_LOST'].includes(err.code)) {
-          console.warn(`[Database Fallback] MySQL error (${err.code}: ${err.message}). Seamlessly serving request from integrated store.`);
-          useRealDb = false;
+        if (['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EHOSTUNREACH', 'PROTOCOL_CONNECTION_LOST'].includes(err.code)) {
+          console.warn(`[Database Warning] Network issue (${err.code}). Serving query from fallback store.`);
           return mockPool.execute(sql, params);
         }
         throw err;
@@ -733,16 +750,23 @@ const resilientPool = {
     return mockPool.execute(sql, params);
   },
   getConnection: async () => {
-    if (useRealDb && realPool) {
+    if (realPool && process.env.USE_REAL_MYSQL === 'true' && !isLocalhost) {
       try {
         return await realPool.getConnection();
       } catch (err) {
-        console.warn(`[Database Fallback] MySQL getConnection error (${err.code}). Seamlessly serving request from integrated store.`);
-        useRealDb = false;
+        console.warn(`[Database Warning] getConnection issue (${err.code}).`);
         return mockPool.getConnection();
       }
     }
     return mockPool.getConnection();
+  },
+  end: async () => {
+    if (typeof initPromise !== 'undefined' && initPromise) {
+      await initPromise.catch(() => {});
+    }
+    if (realPool) {
+      await realPool.end();
+    }
   }
 };
 

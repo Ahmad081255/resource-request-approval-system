@@ -76,12 +76,16 @@ router.get('/export/requests-csv', authorize('Manager', 'Administrator'), async 
 router.get('/audit', authorize('Administrator'), async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT al.*, u.full_name, u.username FROM audit_logs al
+      `SELECT al.*, 
+              COALESCE(al.created_at, al.timestamp) AS created_at,
+              u.full_name, u.username 
+       FROM audit_logs al
        LEFT JOIN users u ON al.user_id = u.user_id
-       ORDER BY al.created_at DESC LIMIT 200`
+       ORDER BY al.log_id DESC LIMIT 200`
     );
     res.json(rows);
   } catch (err) {
+    console.error('[Audit Route Error]:', err);
     res.status(500).json({ error: 'Failed to load audit trail.' });
   }
 });

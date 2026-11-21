@@ -7,7 +7,10 @@
     "dev": "node server.js",
     "build": "vite build frontend --outDir ../dist",
     "start": "node server.js",
-    "lint": "vite build frontend --outDir ../dist"
+    "lint": "vite build frontend --outDir ../dist",
+    "test": "node --test --test-reporter=spec tests/**/*.test.js",
+    "test:unit": "node --test --test-reporter=spec tests/unit/*.test.js",
+    "test:integration": "node --test --test-reporter=spec tests/integration/*.test.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -19,6 +22,7 @@
     "lucide-react": "^1.32.0",
     "mysql2": "^3.11.0",
     "nodemailer": "^9.0.5",
+    "pdfkit": "^0.20.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.5",

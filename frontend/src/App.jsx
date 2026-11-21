@@ -16,6 +16,7 @@ import AdminUsers from './pages/admin/Users';
 import AdminResources from './pages/admin/Resources';
 import AdminDepartments from './pages/admin/Departments';
 import AdminAudit from './pages/admin/Audit';
+import Documentation from './pages/Documentation';
 
 function Protected({ children, roles }) {
   const { user } = useAuth();
@@ -44,6 +45,7 @@ export default function App() {
       <Route path="/admin/resources" element={<Protected roles={['Administrator']}><AdminResources /></Protected>} />
       <Route path="/admin/departments" element={<Protected roles={['Administrator']}><AdminDepartments /></Protected>} />
       <Route path="/admin/audit" element={<Protected roles={['Administrator']}><AdminAudit /></Protected>} />
+      <Route path="/docs" element={<Protected><Documentation /></Protected>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

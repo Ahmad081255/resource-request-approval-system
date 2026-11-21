@@ -11,7 +11,10 @@ router.use(authenticate);
 router.get('/', async (req, res) => {
   try {
     let query = `
-      SELECT rq.*, u.full_name AS requester_name, d.department_name
+      SELECT rq.*, 
+             COALESCE(rq.request_date, rq.created_at) AS request_date,
+             COALESCE(rq.created_at, rq.request_date) AS created_at,
+             u.full_name AS requester_name, d.department_name
       FROM requests rq
       JOIN users u ON rq.user_id = u.user_id
       LEFT JOIN departments d ON u.department_id = d.department_id
@@ -22,7 +25,7 @@ router.get('/', async (req, res) => {
       query += ' WHERE rq.user_id = ?';
       params.push(req.user.user_id);
     }
-    query += ' ORDER BY rq.created_at DESC';
+    query += ' ORDER BY rq.request_id DESC';
 
     const [rows] = await pool.query(query, params);
     res.json(rows);
@@ -36,7 +39,11 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const [reqRows] = await pool.query(
-      `SELECT rq.*, u.full_name AS requester_name FROM requests rq
+      `SELECT rq.*, 
+              COALESCE(rq.request_date, rq.created_at) AS request_date,
+              COALESCE(rq.created_at, rq.request_date) AS created_at,
+              u.full_name AS requester_name 
+       FROM requests rq
        JOIN users u ON rq.user_id = u.user_id WHERE rq.request_id = ?`,
       [req.params.id]
     );
@@ -48,9 +55,13 @@ router.get('/:id', async (req, res) => {
     }
 
     const [approvals] = await pool.query(
-      `SELECT a.*, u.full_name AS approver_name FROM approvals a
+      `SELECT a.*, 
+              COALESCE(a.decision_date, a.approval_date) AS decision_date,
+              COALESCE(a.approval_date, a.decision_date) AS approval_date,
+              u.full_name AS approver_name 
+       FROM approvals a
        JOIN users u ON a.approver_id = u.user_id
-       WHERE a.request_id = ? ORDER BY a.approval_date DESC`,
+       WHERE a.request_id = ? ORDER BY a.approval_id DESC`,
       [req.params.id]
     );
 
@@ -87,18 +98,18 @@ router.post('/', authorize('Staff', 'Manager', 'Administrator'), async (req, res
         [a.user_id, result.insertId, `${req.user.full_name} submitted a new request for ${resource_type}.`]
       );
 
-      if (a.email) {
-        sendNewRequestEmail({
-          approverEmail: a.email,
-          approverName: a.full_name,
-          requesterName: req.user.full_name,
-          resourceType,
-          quantity,
-          purpose,
-          requestId: result.insertId,
-          appUrl
-        }).catch(err => console.error('[Email Notification Error]:', err.message));
-      }
+      const targetEmail = a.email || `${a.full_name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@miva.edu.ng`;
+      sendNewRequestEmail({
+        approverEmail: targetEmail,
+        approverName: a.full_name,
+        requesterName: req.user.full_name,
+        requesterDepartment: req.user.department_name,
+        resourceType: resource_type,
+        quantity,
+        purpose,
+        requestId: result.insertId,
+        appUrl
+      }).catch(err => console.error('[Email Notification Error]:', err.message));
     }
 
     await logActivity(req.user.user_id, 'SUBMIT_REQUEST', `Requested ${quantity} x ${resource_type}`);
@@ -142,20 +153,19 @@ router.patch('/:id/decision', authorize('Manager', 'Administrator'), async (req,
     );
 
     // Send email notification to requester
-    if (request.requester_email) {
-      const appUrl = `${req.protocol}://${req.get('host')}`;
-      sendRequestDecisionEmail({
-        requesterEmail: request.requester_email,
-        requesterName: request.requester_name,
-        resourceType: request.resource_type,
-        quantity: request.quantity,
-        decision,
-        remarks,
-        approverName: req.user.full_name,
-        requestId: req.params.id,
-        appUrl
-      }).catch(err => console.error('[Email Notification Error]:', err.message));
-    }
+    const targetRequesterEmail = request.requester_email || (request.requester_name ? `${request.requester_name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@miva.edu.ng` : 'staff@miva.edu.ng');
+    const appUrl = `${req.protocol}://${req.get('host')}`;
+    sendRequestDecisionEmail({
+      requesterEmail: targetRequesterEmail,
+      requesterName: request.requester_name,
+      resourceType: request.resource_type,
+      quantity: request.quantity,
+      decision,
+      remarks,
+      approverName: req.user.full_name,
+      requestId: req.params.id,
+      appUrl
+    }).catch(err => console.error('[Email Notification Error]:', err.message));
 
     await logActivity(req.user.user_id, 'REQUEST_DECISION', `Request #${req.params.id} marked ${decision}`);
 

@@ -35,6 +35,58 @@ router.get('/meta/lookup', async (req, res) => {
   }
 });
 
+// GET /api/users/dashboard/stats -- dashboard KPI counts & department breakdown
+router.get('/dashboard/stats', async (req, res) => {
+  try {
+    const isStaff = req.user.role_name === 'Staff';
+    const whereClause = isStaff ? 'WHERE user_id = ?' : '';
+    const params = isStaff ? [req.user.user_id] : [];
+
+    const [statusRows] = await pool.query(
+      `SELECT status, COUNT(*) AS count FROM requests ${whereClause} GROUP BY status`,
+      params
+    );
+
+    const stats = {
+      pending: 0,
+      approved: 0,
+      modification_requested: 0,
+      rejected: 0,
+      total: 0,
+      byDepartment: []
+    };
+
+    for (const row of statusRows) {
+      const count = Number(row.count) || 0;
+      stats.total += count;
+      if (Object.prototype.hasOwnProperty.call(stats, row.status) && row.status !== 'total' && row.status !== 'byDepartment') {
+        stats[row.status] = count;
+      }
+    }
+
+    if (!isStaff) {
+      const [deptRows] = await pool.query(
+        `SELECT COALESCE(d.department_name, 'Unassigned') AS department_name,
+                COUNT(rq.request_id) AS count
+         FROM requests rq
+         JOIN users u ON rq.user_id = u.user_id
+         LEFT JOIN departments d ON u.department_id = d.department_id
+         GROUP BY d.department_name
+         ORDER BY count DESC`
+      );
+      stats.byDepartment = deptRows.map((d) => ({
+        department_name: d.department_name,
+        count: Number(d.count) || 0
+      }));
+    }
+
+    res.json(stats);
+  } catch (err) {
+    console.error('[Dashboard Stats Error]:', err);
+    res.status(500).json({ error: 'Failed to load dashboard statistics.' });
+  }
+});
+
 // POST /api/users -- Administrator creates a user with a specific role
 router.post('/', authorize('Administrator'), async (req, res) => {
   const { full_name, username, email, password, role_id, department_id } = req.body;
