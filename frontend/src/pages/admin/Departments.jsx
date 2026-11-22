@@ -15,7 +15,11 @@ export default function AdminDepartments() {
   async function load() {
     setLoading(true);
     try {
-      setDepartments(await api.get('/departments'));
+      const data = await api.get('/departments');
+      setDepartments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setPageError(err.message || 'Failed to load departments.');
+      setDepartments([]);
     } finally {
       setLoading(false);
     }

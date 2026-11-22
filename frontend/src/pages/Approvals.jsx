@@ -14,7 +14,7 @@ export default function Approvals() {
     setLoading(true);
     try {
       const data = await api.get('/requests');
-      setRequests(data.filter((r) => r.status === 'pending'));
+      setRequests(Array.isArray(data) ? data.filter((r) => r.status === 'pending') : []);
     } catch (err) {
       setError(err.message);
     } finally {

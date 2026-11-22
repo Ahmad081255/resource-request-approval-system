@@ -59,8 +59,8 @@ export default function Notifications() {
         api.get('/notifications/email-logs').catch(() => []),
         api.get('/notifications/mailtrap-config').catch(() => null)
       ]);
-      setItems(notifs || []);
-      setEmailLogs(logs || []);
+      setItems(Array.isArray(notifs) ? notifs : []);
+      setEmailLogs(Array.isArray(logs) ? logs : []);
       if (mailtrapData) {
         setConfig(prev => ({
           ...prev,

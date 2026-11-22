@@ -7,7 +7,10 @@ export default function AdminAudit() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/reports/audit').then(setLogs).finally(() => setLoading(false));
+    api.get('/reports/audit')
+      .then((data) => setLogs(Array.isArray(data) ? data : []))
+      .catch(() => setLogs([]))
+      .finally(() => setLoading(false));
   }, []);
 
   function exportAuditCSV() {

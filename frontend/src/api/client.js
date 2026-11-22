@@ -11,11 +11,14 @@ async function request(path, { method = 'GET', body, token } = {}) {
     body: body ? JSON.stringify(body) : undefined
   });
 
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    data = null;
+  let data = null;
+  let parseFailed = false;
+  if (res.status !== 204) {
+    try {
+      data = await res.json();
+    } catch {
+      parseFailed = true;
+    }
   }
 
   if (res.status === 401 && !path.startsWith('/auth/login') && !path.startsWith('/auth/register')) {
@@ -26,6 +29,9 @@ async function request(path, { method = 'GET', body, token } = {}) {
 
   if (!res.ok) {
     throw new Error((data && data.error) || 'Something went wrong. Please try again.');
+  }
+  if (parseFailed) {
+    throw new Error('Unexpected response from server.');
   }
   return data;
 }

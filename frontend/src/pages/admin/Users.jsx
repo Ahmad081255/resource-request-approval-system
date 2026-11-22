@@ -16,9 +16,11 @@ export default function AdminUsers() {
     setLoading(true);
     try {
       const [u, meta] = await Promise.all([api.get('/users'), api.get('/users/meta/lookup')]);
-      setUsers(u);
-      setRoles(meta.roles);
-      setDepartments(meta.departments);
+      setUsers(Array.isArray(u) ? u : []);
+      setRoles(Array.isArray(meta?.roles) ? meta.roles : []);
+      setDepartments(Array.isArray(meta?.departments) ? meta.departments : []);
+    } catch (err) {
+      setError(err.message || 'Failed to load user directory.');
     } finally {
       setLoading(false);
     }

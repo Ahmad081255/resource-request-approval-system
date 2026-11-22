@@ -14,7 +14,7 @@ export default function Requests() {
 
   useEffect(() => {
     api.get('/requests')
-      .then(setRequests)
+      .then((data) => setRequests(Array.isArray(data) ? data : []))
       .catch((err) => setError(err.message || 'Failed to load requests.'))
       .finally(() => setLoading(false));
   }, []);

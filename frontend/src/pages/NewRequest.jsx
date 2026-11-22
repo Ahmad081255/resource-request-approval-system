@@ -12,7 +12,9 @@ export default function NewRequest() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/resources').then(setResources).catch(() => {});
+    api.get('/resources')
+      .then((data) => setResources(Array.isArray(data) ? data : []))
+      .catch(() => setResources([]));
   }, []);
 
   function update(field, value) {

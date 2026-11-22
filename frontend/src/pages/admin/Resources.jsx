@@ -15,7 +15,11 @@ export default function AdminResources() {
   async function load() {
     setLoading(true);
     try {
-      setResources(await api.get('/resources'));
+      const data = await api.get('/resources');
+      setResources(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setPageError(err.message || 'Failed to load resources.');
+      setResources([]);
     } finally {
       setLoading(false);
     }

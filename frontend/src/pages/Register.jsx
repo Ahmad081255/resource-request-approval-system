@@ -14,7 +14,9 @@ export default function Register() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/departments').then(setDepartments).catch(() => {});
+    api.get('/departments')
+      .then((data) => setDepartments(Array.isArray(data) ? data : []))
+      .catch(() => setDepartments([]));
   }, []);
 
   function update(field, value) {
@@ -168,11 +170,11 @@ export default function Register() {
                   value={form.department_id}
                   onChange={(e) => update('department_id', e.target.value)}
                   required
-                  disabled={departments.length === 0}
+                  disabled={!Array.isArray(departments) || departments.length === 0}
                   className="block w-full pl-10 pr-3.5 py-2.5 text-sm bg-slate-50/50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all"
                 >
-                  <option value="">{departments.length === 0 ? 'No departments available yet' : 'Select your department…'}</option>
-                  {departments.map((d) => (
+                  <option value="">{!Array.isArray(departments) || departments.length === 0 ? 'No departments available yet' : 'Select your department…'}</option>
+                  {(Array.isArray(departments) ? departments : []).map((d) => (
                     <option key={d.department_id} value={d.department_id}>
                       {d.department_name}
                     </option>
