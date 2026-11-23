@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import Stamp from '../../components/Stamp';
-import { Users, UserPlus, X, AlertCircle, ShieldCheck, Mail, Building2 } from 'lucide-react';
+import { Users, UserPlus, X, AlertCircle, CheckCircle2, Mail } from 'lucide-react';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -10,6 +10,8 @@ export default function AdminUsers() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ full_name: '', username: '', email: '', password: '', role_id: '', department_id: '' });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -35,28 +37,43 @@ export default function AdminUsers() {
   async function handleCreate(e) {
     e.preventDefault();
     setError('');
+    setSuccess('');
+    setSubmitting(true);
     try {
-      await api.post('/users', { ...form, department_id: form.department_id || null });
+      const res = await api.post('/users', { ...form, department_id: form.department_id || null });
       setForm({ full_name: '', username: '', email: '', password: '', role_id: '', department_id: '' });
       setShowForm(false);
+      setSuccess(res?.message || 'User account created.');
       load();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function changeRole(userId, role_id) {
-    await api.patch(`/users/${userId}`, { role_id });
-    load();
+    setError('');
+    try {
+      await api.patch(`/users/${userId}`, { role_id });
+      load();
+    } catch (err) {
+      setError(err.message || 'Failed to update user role.');
+    }
   }
 
   async function toggleStatus(userId, currentStatus) {
-    if (currentStatus === 'active') {
-      await api.del(`/users/${userId}`);
-    } else {
-      await api.patch(`/users/${userId}`, { status: 'active' });
+    setError('');
+    try {
+      if (currentStatus === 'active') {
+        await api.del(`/users/${userId}`);
+      } else {
+        await api.patch(`/users/${userId}`, { status: 'active' });
+      }
+      load();
+    } catch (err) {
+      setError(err.message || 'Failed to update user status.');
     }
-    load();
   }
 
   return (
@@ -75,7 +92,10 @@ export default function AdminUsers() {
 
         <button
           id="create-user-btn"
-          onClick={() => setShowForm((s) => !s)}
+          onClick={() => {
+            setError('');
+            setShowForm((s) => !s);
+          }}
           className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-xs ${
             showForm
               ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
@@ -86,6 +106,22 @@ export default function AdminUsers() {
           <span>{showForm ? 'Cancel' : 'New User'}</span>
         </button>
       </div>
+
+      {success && (
+        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <span>{success}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccess('')}
+            className="text-xs font-semibold hover:underline shrink-0 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* New User Modal / Inline Card */}
       {showForm && (
@@ -201,12 +237,20 @@ export default function AdminUsers() {
               </select>
             </div>
 
-            <div className="pt-2">
+            <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 text-xs text-indigo-800 dark:text-indigo-300 flex items-start gap-2">
+              <Mail className="w-4 h-4 shrink-0 mt-0.5 text-indigo-600 dark:text-indigo-400" />
+              <span>
+                An email containing the username, temporary password, and a security reminder to change the password immediately after login will be sent automatically to the user.
+              </span>
+            </div>
+
+            <div className="pt-1">
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all shadow-xs cursor-pointer"
+                disabled={submitting}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
               >
-                Save User Account
+                {submitting ? 'Creating & Sending Email…' : 'Save User Account'}
               </button>
             </div>
           </form>

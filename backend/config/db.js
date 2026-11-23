@@ -207,10 +207,9 @@ function executeMockQuery(sql, params = []) {
   }
 
   // 2. AUTH: Check existing username or email
-  // SELECT user_id FROM users WHERE username = ? OR email = ?
-  if (upper.includes('SELECT USER_ID FROM USERS WHERE USERNAME = ? OR EMAIL = ?')) {
+  if (upper.includes('SELECT USER_ID FROM USERS WHERE USERNAME = ?') && upper.includes('EMAIL')) {
     const [uname, email] = params;
-    const match = users.filter(u => u.username === uname || u.email === email);
+    const match = users.filter(u => u.username === uname || u.email.toLowerCase() === String(email || '').toLowerCase());
     return [match.map(u => ({ user_id: u.user_id }))];
   }
 
@@ -284,8 +283,7 @@ function executeMockQuery(sql, params = []) {
     return [match.map(u => ({ user_id: u.user_id, username: u.username }))];
   }
 
-  // 8. AUTH: Reset password
-  // UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE user_id = ?
+  // 8. AUTH: Reset / Change password
   if (upper.includes('UPDATE USERS SET PASSWORD_HASH = ?')) {
     const [password_hash, user_id] = params;
     const u = users.find(u => u.user_id === Number(user_id));
@@ -295,6 +293,21 @@ function executeMockQuery(sql, params = []) {
       u.reset_token_expires = null;
     }
     return [{ affectedRows: u ? 1 : 0 }];
+  }
+
+  if (upper.includes('SELECT USER_ID, USERNAME, PASSWORD_HASH FROM USERS WHERE USER_ID = ?')) {
+    const u = users.find(item => item.user_id === Number(params[0]));
+    return [u ? [{ user_id: u.user_id, username: u.username, password_hash: u.password_hash }] : []];
+  }
+
+  if (upper.includes('SELECT ROLE_NAME FROM ROLES WHERE ROLE_ID = ?')) {
+    const r = roles.find(item => item.role_id === Number(params[0]));
+    return [r ? [{ role_name: r.role_name }] : []];
+  }
+
+  if (upper.includes('SELECT DEPARTMENT_NAME FROM DEPARTMENTS WHERE DEPARTMENT_ID = ?')) {
+    const d = departments.find(item => item.department_id === Number(params[0]));
+    return [d ? [{ department_name: d.department_name }] : []];
   }
 
   // 9. REQUESTS: Get all requests (or filtered by user_id)

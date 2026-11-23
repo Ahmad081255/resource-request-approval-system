@@ -580,6 +580,115 @@ async function sendPasswordResetEmail({ userEmail, userName, code, resetLink }) 
   });
 }
 
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * 4. Welcome / Account Created Email (Admin-Provisioned User Credentials)
+ */
+async function sendAccountCreatedEmail({ userEmail, fullName, username, temporaryPassword, roleName, departmentName, loginUrl }) {
+  const subject = `[RRAM] Your Account Has Been Created — Login Credentials`;
+  const safeName = escapeHtml(fullName || username || 'User');
+  const safeUsername = escapeHtml(username);
+  const safeEmail = escapeHtml(userEmail);
+  const safePassword = escapeHtml(temporaryPassword);
+  const safeRole = escapeHtml(roleName || 'Staff');
+  const safeDept = escapeHtml(departmentName || '');
+  const actionUrl = loginUrl || 'http://localhost:3000/login';
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; color: #0f172a; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .header { background: #0f172a; padding: 28px 24px; color: #ffffff; border-bottom: 3px solid #6366f1; }
+        .header .badge { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; padding: 4px 10px; border-radius: 6px; margin-bottom: 8px; }
+        .header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+        .header p { margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; }
+        .body { padding: 28px 24px; }
+        .credentials-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin: 18px 0; }
+        .cred-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; gap: 12px; }
+        .cred-row:last-child { border-bottom: none; }
+        .cred-label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; }
+        .cred-val { font-size: 13px; font-weight: 700; color: #0f172a; font-family: 'SFMono-Regular', Consolas, Menlo, monospace; text-align: right; word-break: break-all; }
+        .security-note { background: #fffbeb; border: 1px solid #fcd34d; border-left: 4px solid #d97706; border-radius: 8px; padding: 14px 16px; margin: 18px 0; font-size: 13px; color: #78350f; line-height: 1.5; }
+        .cta-container { text-align: center; margin: 24px 0 8px 0; }
+        .cta { display: inline-block; background: #4f46e5; color: #ffffff !important; text-decoration: none; padding: 12px 26px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+        .footer { padding: 18px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="badge">Account Provisioned</div>
+          <h1>Welcome to RRAM</h1>
+          <p>Resource Request & Approval Management System</p>
+        </div>
+        <div class="body">
+          <p style="font-size: 15px; font-weight: 600; margin-top: 0;">Hello ${safeName},</p>
+          <p style="font-size: 14px; color: #475569; line-height: 1.5;">
+            An administrator has created an RRAM account for you. Below are your temporary sign-in credentials:
+          </p>
+
+          <div class="credentials-card">
+            <div class="cred-row">
+              <span class="cred-label">Username</span>
+              <span class="cred-val">${safeUsername}</span>
+            </div>
+            <div class="cred-row">
+              <span class="cred-label">Email</span>
+              <span class="cred-val">${safeEmail}</span>
+            </div>
+            <div class="cred-row">
+              <span class="cred-label">Temporary Password</span>
+              <span class="cred-val">${safePassword}</span>
+            </div>
+            <div class="cred-row">
+              <span class="cred-label">Assigned Role</span>
+              <span class="cred-val">${safeRole}</span>
+            </div>
+            ${safeDept ? `
+            <div class="cred-row">
+              <span class="cred-label">Department</span>
+              <span class="cred-val">${safeDept}</span>
+            </div>` : ''}
+          </div>
+
+          <div class="security-note">
+            <strong>Security Notice:</strong> For your protection, please <strong>change your temporary password immediately after logging in</strong> using the <em>Change Password</em> button in the portal sidebar (or <em>Forgot Password</em> on the sign-in screen). Never share your password with anyone.
+          </div>
+
+          <div class="cta-container">
+            <a href="${escapeHtml(actionUrl)}" class="cta">Sign In to RRAM</a>
+          </div>
+        </div>
+        <div class="footer">
+          RRAM System · Automated Account Provisioning Notification
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendNotificationEmail({
+    to: userEmail,
+    subject,
+    eventType: 'account_created',
+    text: `Hello ${fullName || username}, your RRAM account has been created.\n\nUsername: ${username}\nEmail: ${userEmail}\nTemporary Password: ${temporaryPassword}\nRole: ${roleName || 'Staff'}${departmentName ? `\nDepartment: ${departmentName}` : ''}\n\nSECURITY NOTICE: Please change your temporary password immediately after logging in for security purposes.\n\nSign in: ${actionUrl}`,
+    html
+  });
+}
+
 function getEmailLogs() {
   return emailLogs;
 }
@@ -597,5 +706,6 @@ module.exports = {
   sendNewRequestEmail,
   sendRequestDecisionEmail,
   sendPasswordResetEmail,
+  sendAccountCreatedEmail,
   getEmailLogs
 };
