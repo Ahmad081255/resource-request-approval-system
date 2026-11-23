@@ -75,14 +75,14 @@ router.post('/test-email', async (req, res) => {
     html: `
       <div style="font-family: sans-serif; padding: 24px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; max-width: 540px;">
         <div style="background: #4f46e5; color: #ffffff; padding: 14px 18px; border-radius: 8px; margin-bottom: 18px;">
-          <h2 style="margin: 0; font-size: 16px;">Mailtrap Delivery Verification</h2>
+          <h2 style="margin: 0; font-size: 16px;">RRAM Email Delivery Verification</h2>
         </div>
         <p style="font-size: 14px; color: #1e293b; margin-top: 0;">Hello <strong>${req.user.full_name}</strong>,</p>
         <p style="font-size: 13px; color: #475569; line-height: 1.5;">This email confirms that your RRAM email notification engine is connected and delivering emails.</p>
         <div style="background: #f1f5f9; padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 12px; color: #334155; margin: 14px 0;">
           Recipient: ${recipient}<br/>
           Time: ${new Date().toLocaleString()}<br/>
-          Engine: Mailtrap Ready
+          Engine: SMTP Ready
         </div>
         <p style="font-size: 11px; color: #94a3b8; margin-top: 20px;">RRAM System · Resource Request & Approval Management</p>
       </div>

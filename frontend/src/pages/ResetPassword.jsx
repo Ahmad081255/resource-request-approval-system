@@ -45,15 +45,15 @@ export default function ResetPassword() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 mb-3">
               <AlertCircle className="w-6 h-6" />
             </div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Invalid or Missing Token</h2>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Use 6-Digit Email Code</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
-              This password reset link is invalid or has expired.
+              Password resets now use a 6-digit verification code sent directly to your email inbox.
             </p>
             <Link
               to="/forgot-password"
               className="inline-flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-all"
             >
-              Request a New Link
+              Reset with 6-Digit Code
             </Link>
           </div>
         </div>

@@ -22,25 +22,31 @@ async function loadConfig() {
       dbSettings[r.setting_key] = r.setting_value;
     }
 
-    const host = dbSettings.smtp_host || process.env.MAILTRAP_HOST || process.env.SMTP_HOST || 'sandbox.smtp.mailtrap.io';
-    const port = Number(dbSettings.smtp_port || process.env.MAILTRAP_PORT || process.env.SMTP_PORT) || 2525;
-    const secure = (dbSettings.smtp_secure || process.env.SMTP_SECURE) === 'true';
-    const user = dbSettings.smtp_user || process.env.MAILTRAP_USER || process.env.SMTP_USER || '';
-    const pass = dbSettings.smtp_pass || process.env.MAILTRAP_PASS || process.env.SMTP_PASS || '';
-    const from = dbSettings.email_from || process.env.EMAIL_FROM || '"RRAM Notifications" <notifications@rram-portal.com>';
+    const host = (dbSettings.smtp_host || process.env.SMTP_HOST || process.env.smtp_host || process.env.MAILTRAP_HOST || 'sandbox.smtp.mailtrap.io').trim();
+    const port = Number(dbSettings.smtp_port || process.env.SMTP_PORT || process.env.smtp_port || process.env.MAILTRAP_PORT) || 2525;
+    const rawSecure = dbSettings.smtp_secure ?? process.env.SMTP_SECURE ?? process.env.smtp_secure;
+    const secure = rawSecure !== undefined
+      ? String(rawSecure).trim().toLowerCase() === 'true'
+      : port === 465;
+    const user = (dbSettings.smtp_user || process.env.SMTP_USER || process.env.SMTP_USERNAME || process.env.smtp_user || process.env.MAILTRAP_USER || '').trim();
+    const pass = (dbSettings.smtp_pass || process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.smtp_pass || process.env.MAILTRAP_PASS || '').trim();
+    const from = (dbSettings.email_from || process.env.EMAIL_FROM || process.env.email_from || (user.includes('@') ? `"RRAM Notifications" <${user}>` : '"RRAM Notifications" <notifications@rram-portal.com>')).trim();
 
-    activeConfig = { host, port, secure, user, pass, from };
+    activeConfig = { host, port, secure: port === 465 ? true : secure, user, pass, from };
     return activeConfig;
   } catch (err) {
     // If DB read fails, fall back to process.env
-    const host = process.env.MAILTRAP_HOST || process.env.SMTP_HOST || 'sandbox.smtp.mailtrap.io';
-    const port = Number(process.env.MAILTRAP_PORT || process.env.SMTP_PORT) || 2525;
-    const secure = process.env.SMTP_SECURE === 'true';
-    const user = process.env.MAILTRAP_USER || process.env.SMTP_USER || '';
-    const pass = process.env.MAILTRAP_PASS || process.env.SMTP_PASS || '';
-    const from = process.env.EMAIL_FROM || '"RRAM Notifications" <notifications@rram-portal.com>';
+    const host = (process.env.SMTP_HOST || process.env.smtp_host || process.env.MAILTRAP_HOST || 'sandbox.smtp.mailtrap.io').trim();
+    const port = Number(process.env.SMTP_PORT || process.env.smtp_port || process.env.MAILTRAP_PORT) || 2525;
+    const rawSecure = process.env.SMTP_SECURE ?? process.env.smtp_secure;
+    const secure = rawSecure !== undefined
+      ? String(rawSecure).trim().toLowerCase() === 'true'
+      : port === 465;
+    const user = (process.env.SMTP_USER || process.env.SMTP_USERNAME || process.env.smtp_user || process.env.MAILTRAP_USER || '').trim();
+    const pass = (process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.smtp_pass || process.env.MAILTRAP_PASS || '').trim();
+    const from = (process.env.EMAIL_FROM || process.env.email_from || (user.includes('@') ? `"RRAM Notifications" <${user}>` : '"RRAM Notifications" <notifications@rram-portal.com>')).trim();
 
-    activeConfig = { host, port, secure, user, pass, from };
+    activeConfig = { host, port, secure: port === 465 ? true : secure, user, pass, from };
     return activeConfig;
   }
 }
@@ -171,12 +177,12 @@ async function saveConfig({ host, port, secure, user, pass, from }) {
  */
 function getSafeConfig() {
   const config = activeConfig || {
-    host: process.env.MAILTRAP_HOST || process.env.SMTP_HOST || 'sandbox.smtp.mailtrap.io',
-    port: Number(process.env.MAILTRAP_PORT || process.env.SMTP_PORT) || 2525,
-    secure: false,
-    user: process.env.MAILTRAP_USER || process.env.SMTP_USER || '',
-    pass: process.env.MAILTRAP_PASS || process.env.SMTP_PASS || '',
-    from: process.env.EMAIL_FROM || '"RRAM Notifications" <notifications@rram-portal.com>'
+    host: process.env.SMTP_HOST || process.env.smtp_host || process.env.MAILTRAP_HOST || 'sandbox.smtp.mailtrap.io',
+    port: Number(process.env.SMTP_PORT || process.env.smtp_port || process.env.MAILTRAP_PORT) || 2525,
+    secure: String(process.env.SMTP_SECURE || process.env.smtp_secure || '').trim().toLowerCase() === 'true' || Number(process.env.SMTP_PORT || process.env.smtp_port) === 465,
+    user: process.env.SMTP_USER || process.env.SMTP_USERNAME || process.env.smtp_user || process.env.MAILTRAP_USER || '',
+    pass: process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.smtp_pass || process.env.MAILTRAP_PASS || '',
+    from: process.env.EMAIL_FROM || process.env.email_from || '"RRAM Notifications" <notifications@rram-portal.com>'
   };
 
   const isConfigured = Boolean(config.user && config.pass);
@@ -225,11 +231,14 @@ async function sendNotificationEmail({ to, subject, html, text, eventType = 'not
     const transport = await getTransporter();
     const config = activeConfig || (await loadConfig());
     const from = config.from || '"RRAM Notifications" <notifications@rram-portal.com>';
+    const overrideTo = (process.env.EMAIL_OVERRIDE_TO || '').trim();
+    const actualRecipient = overrideTo || to;
+    const effectiveSubject = overrideTo && overrideTo !== to ? `${subject} [Intended: ${to}]` : subject;
 
     const mailOptions = {
       from,
-      to,
-      subject,
+      to: actualRecipient,
+      subject: effectiveSubject,
       text: text || subject,
       html
     };
@@ -258,8 +267,8 @@ async function sendNotificationEmail({ to, subject, html, text, eventType = 'not
 
         const logEntry = {
           id: info.messageId || `msg-${Date.now()}`,
-          to,
-          subject,
+          to: actualRecipient,
+          subject: effectiveSubject,
           eventType,
           provider: providerLabel,
           isMailtrap,
@@ -270,7 +279,7 @@ async function sendNotificationEmail({ to, subject, html, text, eventType = 'not
         emailLogs.unshift(logEntry);
         if (emailLogs.length > 100) emailLogs.pop();
 
-        console.log(`[Email Service] Delivered (${providerLabel}) To: <${to}> | Subject: "${subject}" | ID: ${info.messageId}`);
+        console.log(`[Email Service] Delivered (${providerLabel}) To: <${actualRecipient}> | Subject: "${effectiveSubject}" | ID: ${info.messageId}`);
         return { success: true, messageId: info.messageId, provider: providerLabel };
       } catch (err) {
         lastError = err;
@@ -291,11 +300,11 @@ async function sendNotificationEmail({ to, subject, html, text, eventType = 'not
       }
     }
 
-    console.error(`[Email Service Error] Failed sending to ${to}:`, lastError?.message);
+    console.error(`[Email Service Error] Failed sending to ${actualRecipient}:`, lastError?.message);
     const logEntry = {
       id: `err-${Date.now()}`,
-      to,
-      subject,
+      to: actualRecipient,
+      subject: effectiveSubject,
       eventType,
       provider: providerLabel,
       isMailtrap,
@@ -383,7 +392,7 @@ async function sendNewRequestEmail({ approverEmail, approverName, requesterName,
           </div>
         </div>
         <div class="footer">
-          Delivered via RRAM Notification Engine (Mailtrap Connected).<br/>
+          Delivered via RRAM Notification Engine.<br/>
           This is an automated system email for requisition #${requestId}.
         </div>
       </div>
@@ -490,7 +499,7 @@ async function sendRequestDecisionEmail({ requesterEmail, requesterName, resourc
           </div>
         </div>
         <div class="footer">
-          Delivered via RRAM Notification Engine (Mailtrap Connected).<br/>
+          Delivered via RRAM Notification Engine.<br/>
           This is an official decision notification for requisition #${requestId}.
         </div>
       </div>
@@ -508,10 +517,12 @@ async function sendRequestDecisionEmail({ requesterEmail, requesterName, resourc
 }
 
 /**
- * 3. Password Reset Email
+ * 3. Password Reset Email (6-Digit Verification Code)
  */
-async function sendPasswordResetEmail({ userEmail, userName, resetLink }) {
-  const subject = `[RRAM] Reset Your Password`;
+async function sendPasswordResetEmail({ userEmail, userName, code, resetLink }) {
+  const subject = code
+    ? `[RRAM] Your Password Reset Code: ${code}`
+    : `[RRAM] Reset Your Password`;
 
   const html = `
     <!DOCTYPE html>
@@ -521,9 +532,11 @@ async function sendPasswordResetEmail({ userEmail, userName, resetLink }) {
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
         .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
-        .header { background: #0f172a; padding: 24px; color: #ffffff; }
+        .header { background: #0f172a; padding: 24px; color: #ffffff; border-bottom: 3px solid #6366f1; }
         .header h1 { margin: 0; font-size: 18px; font-weight: 700; }
         .body { padding: 24px; }
+        .otp-box { background: #f1f5f9; border: 1px dashed #6366f1; border-radius: 10px; padding: 18px; text-align: center; margin: 20px 0; }
+        .otp-code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 32px; font-weight: 800; letter-spacing: 0.25em; color: #312e81; }
         .cta { display: inline-block; background: #4f46e5; color: #ffffff !important; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-top: 14px; }
         .footer { padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
       </style>
@@ -531,16 +544,25 @@ async function sendPasswordResetEmail({ userEmail, userName, resetLink }) {
     <body>
       <div class="container">
         <div class="header">
-          <h1>Password Reset Request</h1>
+          <h1>Password Reset Verification Code</h1>
         </div>
         <div class="body">
           <p style="font-size: 14px; margin-top: 0;">Hello ${userName || 'User'},</p>
+          ${code ? `
+          <p style="font-size: 13px; color: #475569; line-height: 1.5;">
+            Use the 6-digit verification code below on the RRAM Reset Password screen to set a new password. This code expires in <strong>15 minutes</strong>.
+          </p>
+          <div class="otp-box">
+            <div class="otp-code">${code}</div>
+          </div>
+          ` : `
           <p style="font-size: 13px; color: #475569;">You requested a password reset for your RRAM account. Click the button below to set a new password. This link is valid for 1 hour.</p>
           <a href="${resetLink}" class="cta">Reset Password</a>
-          <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">If you didn't request this reset, you can safely ignore this email.</p>
+          `}
+          <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">If you didn't request this reset, you can safely ignore this email. Never share this code with anyone.</p>
         </div>
         <div class="footer">
-          RRAM System · Mailtrap Notification Service
+          RRAM System · Automated Notification Service
         </div>
       </div>
     </body>
@@ -551,7 +573,9 @@ async function sendPasswordResetEmail({ userEmail, userName, resetLink }) {
     to: userEmail,
     subject,
     eventType: 'password_reset',
-    text: `Reset your RRAM password: ${resetLink}. Valid for 1 hour.`,
+    text: code
+      ? `Your RRAM password reset code is ${code}. Enter this code in the app within 15 minutes to set a new password.`
+      : `Reset your RRAM password: ${resetLink}. Valid for 1 hour.`,
     html
   });
 }

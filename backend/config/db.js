@@ -1,6 +1,21 @@
 const mysql = require('mysql2/promise');
 const path = require('path');
+const _preservedEmailEnv = {
+  SMTP_HOST: process.env.SMTP_HOST,
+  SMTP_PORT: process.env.SMTP_PORT,
+  SMTP_SECURE: process.env.SMTP_SECURE,
+  SMTP_USER: process.env.SMTP_USER,
+  SMTP_PASS: process.env.SMTP_PASS,
+  EMAIL_FROM: process.env.EMAIL_FROM,
+  MAILTRAP_HOST: process.env.MAILTRAP_HOST,
+  MAILTRAP_PORT: process.env.MAILTRAP_PORT,
+  MAILTRAP_USER: process.env.MAILTRAP_USER,
+  MAILTRAP_PASS: process.env.MAILTRAP_PASS
+};
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), override: true });
+for (const [k, v] of Object.entries(_preservedEmailEnv)) {
+  if (v !== undefined && v !== '') process.env[k] = v;
+}
 
 // Initial In-Memory Seed Data (Matches MySQL schema & project figures)
 const roles = [
@@ -20,7 +35,7 @@ const users = [
     user_id: 1,
     full_name: 'Ahmad Yusuf',
     username: 'admin',
-    email: 'admin@miva.edu.ng',
+    email: 'nur.abubakar004+admin@gmail.com',
     password_hash: '$2b$10$t9WfJzZQOZ6bHorS5h9tDumRJpxLedIPsdroJ8pQsbpxzTD1ufdyi', // Password123
     role_id: 1,
     department_id: 3,
@@ -33,7 +48,7 @@ const users = [
     user_id: 2,
     full_name: 'Fatima Bello',
     username: 'manager',
-    email: 'fatima.bello@company.com',
+    email: 'nur.abubakar004+manager@gmail.com',
     password_hash: '$2b$10$t9WfJzZQOZ6bHorS5h9tDumRJpxLedIPsdroJ8pQsbpxzTD1ufdyi', // Password123
     role_id: 2,
     department_id: 1,
@@ -46,7 +61,7 @@ const users = [
     user_id: 3,
     full_name: 'John Okafor',
     username: 'staff',
-    email: 'john.okafor@company.com',
+    email: 'nur.abubakar004+staff@gmail.com',
     password_hash: '$2b$10$t9WfJzZQOZ6bHorS5h9tDumRJpxLedIPsdroJ8pQsbpxzTD1ufdyi', // Password123
     role_id: 3,
     department_id: 1,
@@ -157,6 +172,8 @@ const auditLogs = [
   }
 ];
 
+const systemSettings = {};
+
 let nextUserId = 4;
 let nextDeptId = 4;
 let nextResourceId = 5;
@@ -226,15 +243,13 @@ function executeMockQuery(sql, params = []) {
   }
 
   // 5. AUTH: Forgot password lookup
-  // SELECT user_id, username FROM users WHERE email = ?
-  if (upper.includes('SELECT USER_ID, USERNAME FROM USERS WHERE EMAIL = ?')) {
-    const [email] = params;
-    const match = users.filter(u => u.email === email);
-    return [match.map(u => ({ user_id: u.user_id, username: u.username }))];
+  if (upper.includes('FROM USERS WHERE') && upper.includes('EMAIL = ?')) {
+    const email = String(params[0] || '').toLowerCase();
+    const match = users.filter(u => u.email.toLowerCase() === email && u.status === 'active');
+    return [match.map(u => ({ user_id: u.user_id, username: u.username, full_name: u.full_name, email: u.email }))];
   }
 
   // 6. AUTH: Set reset token
-  // UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE user_id = ?
   if (upper.startsWith('UPDATE USERS SET RESET_TOKEN = ?')) {
     const [token, expires, user_id] = params;
     const u = users.find(u => u.user_id === Number(user_id));
@@ -245,11 +260,27 @@ function executeMockQuery(sql, params = []) {
     return [{ affectedRows: u ? 1 : 0 }];
   }
 
-  // 7. AUTH: Verify reset token
-  // SELECT user_id, username FROM users WHERE reset_token = ? AND reset_token_expires > NOW()
-  if (upper.includes('WHERE RESET_TOKEN = ?')) {
-    const [token] = params;
-    const match = users.filter(u => u.reset_token === token && (!u.reset_token_expires || new Date(u.reset_token_expires) > new Date()));
+  // 7. AUTH: Verify reset token / OTP
+  if (upper.includes('WHERE') && upper.includes('RESET_TOKEN = ?')) {
+    let match = [];
+    if (upper.includes('EMAIL = ?') && params.length >= 2) {
+      const [email, token] = params;
+      match = users.filter(
+        u =>
+          u.email.toLowerCase() === String(email || '').toLowerCase() &&
+          u.reset_token === token &&
+          u.status === 'active' &&
+          (!u.reset_token_expires || new Date(u.reset_token_expires) > new Date())
+      );
+    } else {
+      const [token] = params;
+      match = users.filter(
+        u =>
+          u.reset_token === token &&
+          u.status === 'active' &&
+          (!u.reset_token_expires || new Date(u.reset_token_expires) > new Date())
+      );
+    }
     return [match.map(u => ({ user_id: u.user_id, username: u.username }))];
   }
 
@@ -653,6 +684,36 @@ function executeMockQuery(sql, params = []) {
     };
     auditLogs.push(newLog);
     return [{ insertId: newLog.log_id, affectedRows: 1 }];
+  }
+
+  // 41. SYSTEM_SETTINGS: Select settings
+  if (upper.includes('FROM SYSTEM_SETTINGS')) {
+    const list = Object.entries(systemSettings).map(([setting_key, setting_value]) => ({
+      setting_key,
+      setting_value
+    }));
+    return [list];
+  }
+
+  // 42. SYSTEM_SETTINGS: Upsert setting
+  if (upper.startsWith('INSERT INTO SYSTEM_SETTINGS')) {
+    const [key, value] = params;
+    if (key) systemSettings[key] = value;
+    return [{ affectedRows: 1 }];
+  }
+
+  // 43. REQUESTS: Modify & resubmit request
+  if (upper.startsWith('UPDATE REQUESTS SET RESOURCE_TYPE = ?')) {
+    const [resource_type, resource_id, quantity, purpose, reqId] = params;
+    const r = requests.find(item => item.request_id === Number(reqId));
+    if (r) {
+      r.resource_type = resource_type;
+      r.resource_id = resource_id || null;
+      r.quantity = Number(quantity) || 1;
+      r.purpose = purpose;
+      r.status = 'pending';
+    }
+    return [{ affectedRows: r ? 1 : 0 }];
   }
 
   console.warn('[DB Mock] Unhandled query pattern:', sql, params);

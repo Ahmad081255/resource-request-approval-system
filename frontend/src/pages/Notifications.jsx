@@ -92,12 +92,15 @@ export default function Notifications() {
     setTestResult(null);
     try {
       const res = await api.post('/notifications/test-email', {});
+      const deliveryOk = res?.result?.success !== false;
       setTestResult({
-        success: true,
-        message: 'Test notification email dispatched successfully! Delivered to Mailtrap outbox.'
+        success: deliveryOk,
+        message: deliveryOk
+          ? `Test notification email dispatched successfully! (${res?.result?.provider || 'SMTP'})`
+          : `Email delivery failed: ${res?.result?.error || 'Check SMTP credentials.'}`
       });
       const logs = await api.get('/notifications/email-logs');
-      setEmailLogs(logs || []);
+      setEmailLogs(Array.isArray(logs) ? logs : []);
     } catch (err) {
       setTestResult({
         success: false,
@@ -121,12 +124,12 @@ export default function Notifications() {
       });
       setConfigMessage({
         success: true,
-        text: res.message || 'Handshake successful! Mailtrap SMTP connection verified.'
+        text: res.message || 'Handshake successful! SMTP connection verified.'
       });
     } catch (err) {
       setConfigMessage({
         success: false,
-        text: err.message || 'Connection failed. Please check your Mailtrap Username and Password.'
+        text: err.message || 'Connection failed. Please check your SMTP Username, Password, Host, and Port.'
       });
     } finally {
       setConfigVerifying(false);
@@ -149,7 +152,7 @@ export default function Notifications() {
       const res = await api.post('/notifications/mailtrap-config', payload);
       setConfigMessage({
         success: true,
-        text: 'Mailtrap configuration saved successfully! Emails are now active.'
+        text: 'SMTP configuration saved successfully! Live emails are now active.'
       });
       if (res.config) {
         setConfig(prev => ({ ...prev, ...res.config, pass: '' }));
@@ -185,6 +188,18 @@ export default function Notifications() {
     }
   }
 
+  function applyGmailPresets() {
+    const defaultEmail = user?.email?.includes('@') ? user.email.replace(/\+[^@]+@/, '@') : '';
+    setConfig(prev => ({
+      ...prev,
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      user: defaultEmail || prev.user,
+      from: defaultEmail ? `"RRAM Notifications" <${defaultEmail}>` : prev.from
+    }));
+  }
+
   function applyMailtrapPresets() {
     setConfig(prev => ({
       ...prev,
@@ -207,10 +222,10 @@ export default function Notifications() {
             <span>Email Alerts & In-App Notifications</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Notifications & Mailtrap
+            Notifications & Email Delivery
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Automated email alerts for requisitions, approvals, and rejections delivered via Mailtrap.
+            Automated email alerts for requisitions, approvals, modifications, and rejections.
           </p>
         </div>
 
@@ -299,7 +314,7 @@ export default function Notifications() {
             }`}
           >
             <Settings className="w-3.5 h-3.5" />
-            <span>Mailtrap Setup & Testing</span>
+            <span>Email / SMTP Setup</span>
             {config.isConfigured ? (
               <span className="w-2 h-2 rounded-full bg-emerald-500" title="Connected" />
             ) : (
@@ -382,7 +397,7 @@ export default function Notifications() {
             <div className="flex items-center gap-2">
               <Mail className="w-4 h-4 text-indigo-500" />
               <span>
-                All notification emails sent to Managers, Administrators, and Staff via Mailtrap.
+                All notification emails sent to Managers, Administrators, and Staff via SMTP.
               </span>
             </div>
             <button
@@ -403,7 +418,7 @@ export default function Notifications() {
                 No email notifications sent yet
               </h3>
               <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-sm mx-auto">
-                Submit a new request, approve/reject a request, or use the Mailtrap Testing tab to trigger emails.
+                Submit a new request, approve/reject a request, or use the Email / SMTP Setup tab to trigger test emails.
               </p>
             </div>
           ) : (
@@ -474,13 +489,13 @@ export default function Notifications() {
                           <span className="text-rose-600 dark:text-rose-400 font-semibold">
                             Failed: {log.error || 'SMTP error'}
                           </span>
-                        ) : log.isMailtrap ? (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                            Delivered to Mailtrap
+                        ) : log.provider === 'Local Simulation' ? (
+                          <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                            Simulated (Configure SMTP to send live)
                           </span>
                         ) : (
-                          <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                            Simulated (Configure Mailtrap to send live)
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                            Delivered ({log.provider || 'SMTP'})
                           </span>
                         )}
                       </div>
@@ -512,7 +527,7 @@ export default function Notifications() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Mailtrap SMTP Service Status
+                      SMTP Email Service Status
                     </h3>
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono uppercase ${
@@ -521,25 +536,35 @@ export default function Notifications() {
                           : 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300'
                       }`}
                     >
-                      {config.isConfigured ? 'Connected to Mailtrap' : 'Simulation Mode'}
+                      {config.isConfigured ? config.provider : 'Simulation Mode'}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     {config.isConfigured
-                      ? `Active host: ${config.host}:${config.port} (user: ${config.user})`
-                      : 'Enter your Mailtrap credentials below to deliver emails straight to your Mailtrap Sandbox inbox.'}
+                      ? `Active host: ${config.host}:${config.port} (SSL/TLS: ${config.secure ? 'on' : 'off'}, user: ${config.user})`
+                      : 'Enter your Gmail SMTP or custom SMTP credentials below to deliver real emails.'}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={applyMailtrapPresets}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
-              >
-                <Sliders className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Reset to Mailtrap Sandbox Presets</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={applyGmailPresets}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Gmail SMTP Preset</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={applyMailtrapPresets}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Mailtrap Preset</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -569,7 +594,7 @@ export default function Notifications() {
               </h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Click any button below to instantly trigger a formatted notification email and verify it inside your Mailtrap Sandbox inbox:
+              Click any button below to send a sample workflow email to your account&apos;s inbox:
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -638,10 +663,10 @@ export default function Notifications() {
           {/* Credentials Form */}
           <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
-              Mailtrap Connection Settings
+              SMTP Connection Settings
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
-              Configure your Mailtrap credentials below. These are stored in your TiDB Cloud database and take effect immediately.
+              Save your Gmail or custom SMTP credentials below. These are stored in TiDB Cloud and take effect immediately across all notifications.
             </p>
 
             <form
@@ -651,7 +676,7 @@ export default function Notifications() {
               }}
               className="space-y-4"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     SMTP Host
@@ -660,7 +685,7 @@ export default function Notifications() {
                     type="text"
                     value={config.host}
                     onChange={e => setConfig({ ...config, host: e.target.value })}
-                    placeholder="sandbox.smtp.mailtrap.io"
+                    placeholder="smtp.gmail.com"
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     required
                   />
@@ -673,24 +698,39 @@ export default function Notifications() {
                   <input
                     type="number"
                     value={config.port}
-                    onChange={e => setConfig({ ...config, port: Number(e.target.value) })}
-                    placeholder="2525"
+                    onChange={e => {
+                      const nextPort = Number(e.target.value);
+                      setConfig({ ...config, port: nextPort, secure: nextPort === 465 ? true : config.secure });
+                    }}
+                    placeholder="465"
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     required
                   />
+                </div>
+
+                <div className="flex items-end pb-2">
+                  <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(config.secure)}
+                      onChange={e => setConfig({ ...config, secure: e.target.checked })}
+                      className="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>SSL/TLS (465)</span>
+                  </label>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Mailtrap Username
+                    SMTP Username (Gmail / Login)
                   </label>
                   <input
                     type="text"
                     value={config.user}
                     onChange={e => setConfig({ ...config, user: e.target.value })}
-                    placeholder="e.g. 45f8a912e73bcd"
+                    placeholder="yourname@gmail.com"
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     required
                   />
@@ -698,14 +738,14 @@ export default function Notifications() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Mailtrap Password
+                    SMTP Password / App Password
                   </label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
                       value={config.pass}
                       onChange={e => setConfig({ ...config, pass: e.target.value })}
-                      placeholder={config.hasPassword ? '•••••••••••• (Leave blank to keep current)' : 'e.g. 7d81ef39a04b12'}
+                      placeholder={config.hasPassword ? '•••••••••••• (Leave blank to keep current)' : '16-character Google App Password'}
                       className="w-full px-3.5 py-2 pr-10 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                     <button
@@ -727,7 +767,7 @@ export default function Notifications() {
                   type="text"
                   value={config.from}
                   onChange={e => setConfig({ ...config, from: e.target.value })}
-                  placeholder='"RRAM Notifications" <notifications@rram-portal.com>'
+                  placeholder='"RRAM Notifications" <yourname@gmail.com>'
                   className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
                 />
               </div>
@@ -751,28 +791,24 @@ export default function Notifications() {
                   className="px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
                   <Check className="w-4 h-4" />
-                  <span>{configSaving ? 'Saving…' : 'Save Mailtrap Configuration'}</span>
+                  <span>{configSaving ? 'Saving…' : 'Save SMTP Configuration'}</span>
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Mailtrap Guide Card */}
+          {/* Gmail Setup Guide Card */}
           <div className="p-6 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50">
             <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-2 flex items-center gap-1.5">
               <Mail className="w-4 h-4" />
-              <span>How to find your Mailtrap Credentials</span>
+              <span>Quick Gmail SMTP Setup</span>
             </h4>
             <ol className="text-xs text-slate-600 dark:text-slate-400 space-y-1.5 list-decimal pl-4">
-              <li>Log in to your account at <strong>mailtrap.io</strong>.</li>
-              <li>Navigate to <strong>Email Testing</strong> &rarr; <strong>Inboxes</strong> (select or create an inbox like "My Inbox").</li>
-              <li>Under <strong>SMTP Settings</strong>, look for <strong>Host: sandbox.smtp.mailtrap.io</strong>, <strong>Port: 2525</strong>.</li>
-              <li>Copy your assigned <strong>Username</strong> and <strong>Password</strong>.</li>
-              <li>Paste them into the fields above and click <strong>Save Mailtrap Configuration</strong>.</li>
+              <li>Click <strong>Gmail SMTP Preset</strong> above to prefill <strong>smtp.gmail.com</strong>, port <strong>465</strong>, and <strong>SSL/TLS</strong>.</li>
+              <li>Enter your Gmail address in <strong>SMTP Username</strong> and <strong>Sender Email (From)</strong>.</li>
+              <li>Paste your 16-character <strong>Google App Password</strong> (without spaces) into <strong>SMTP Password</strong>.</li>
+              <li>Click <strong>Test SMTP Connection</strong>, then <strong>Save SMTP Configuration</strong>.</li>
             </ol>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-indigo-100 dark:border-indigo-900/40">
-              Once saved, whenever any user submits a request, or whenever an administrator or manager approves, rejects, or requests modifications on a requisition, an email notification will immediately appear in your Mailtrap inbox with complete HTML styling!
-            </p>
           </div>
         </div>
       )}

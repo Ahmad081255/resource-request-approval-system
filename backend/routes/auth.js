@@ -125,71 +125,89 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// POST /api/auth/forgot-password
-// NOTE: This prototype has no email server configured, so instead of emailing the link,
-// it returns the reset link directly in the API response so you can demo the full flow.
-// In a real deployment, replace the "resetLink" response with an actual email send
-// (e.g. via Nodemailer/SendGrid) and don't return the token to the client.
+// POST /api/auth/forgot-password -- Generate 6-digit OTP and email it to the user
 router.post('/forgot-password', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required.' });
+  const cleanEmail = (req.body.email || '').trim().toLowerCase();
+  if (!cleanEmail) return res.status(400).json({ error: 'Email is required.' });
 
   try {
-    const [rows] = await pool.query('SELECT user_id, username FROM users WHERE email = ?', [email]);
+    const [rows] = await pool.query(
+      "SELECT user_id, username, full_name, email FROM users WHERE LOWER(email) = LOWER(?) AND status = 'active'",
+      [cleanEmail]
+    );
 
-    // Always respond the same way whether or not the email exists, to avoid leaking
-    // which emails are registered. The reset link is only included when a match is found.
+    const genericMsg = 'If an active account matches that email, a 6-digit verification code has been sent to your inbox.';
     if (rows.length === 0) {
-      return res.json({ message: 'If that email is registered, a reset link has been generated.' });
+      return res.json({ message: genericMsg });
     }
 
     const user = rows[0];
-    const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(`${user.email.toLowerCase()}:${otpCode}`)
+      .digest('hex');
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     await pool.query(
       'UPDATE users SET reset_token = ?, reset_expires = ? WHERE user_id = ?',
-      [token, expires, user.user_id]
+      [tokenHash, expires, user.user_id]
     );
 
-    await logActivity(user.user_id, 'FORGOT_PASSWORD', `Reset requested for ${user.username}`);
+    await logActivity(user.user_id, 'FORGOT_PASSWORD', `6-digit reset code requested for ${user.username}`);
 
-    const resetLink = `${req.headers.origin || 'http://localhost:3000'}/reset-password?token=${token}`;
-
-    sendPasswordResetEmail({
-      userEmail: email,
-      userName: user.username,
-      resetLink
+    await sendPasswordResetEmail({
+      userEmail: user.email,
+      userName: user.full_name || user.username,
+      code: otpCode
     }).catch(err => console.error('[Email Notification Error]:', err.message));
 
-    res.json({
-      message: 'If that email is registered, a reset link has been generated and sent.',
-      resetLink // also provided for convenience in preview
-    });
+    res.json({ message: genericMsg });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error while requesting password reset.' });
   }
 });
 
-// POST /api/auth/reset-password
+// POST /api/auth/reset-password -- Verify 6-digit OTP (or legacy token) and update password in DB
 router.post('/reset-password', async (req, res) => {
-  const { token, password } = req.body;
-  if (!token || !password) {
-    return res.status(400).json({ error: 'Token and new password are required.' });
-  }
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  const { email, code, token, password } = req.body;
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanCode = (code || '').trim();
+
+  if (!password || password.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters.' });
   }
 
   try {
-    const [rows] = await pool.query(
-      'SELECT user_id, username FROM users WHERE reset_token = ? AND reset_expires > NOW()',
-      [token]
-    );
+    let rows = [];
+
+    if (cleanCode) {
+      if (!cleanEmail || !/^\d{6}$/.test(cleanCode)) {
+        return res.status(400).json({ error: 'Account email and a valid 6-digit verification code are required.' });
+      }
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(`${cleanEmail}:${cleanCode}`)
+        .digest('hex');
+
+      const now = new Date();
+      [rows] = await pool.query(
+        "SELECT user_id, username FROM users WHERE LOWER(email) = LOWER(?) AND reset_token = ? AND reset_expires > ? AND status = 'active'",
+        [cleanEmail, tokenHash, now]
+      );
+    } else if (token) {
+      const now = new Date();
+      [rows] = await pool.query(
+        "SELECT user_id, username FROM users WHERE reset_token = ? AND reset_expires > ? AND status = 'active'",
+        [token, now]
+      );
+    } else {
+      return res.status(400).json({ error: 'Email, 6-digit verification code, and new password are required.' });
+    }
 
     if (rows.length === 0) {
-      return res.status(400).json({ error: 'This reset link is invalid or has expired. Request a new one.' });
+      return res.status(400).json({ error: 'Invalid or expired verification code. Please check the code or request a new one.' });
     }
 
     const user = rows[0];
@@ -200,9 +218,9 @@ router.post('/reset-password', async (req, res) => {
       [password_hash, user.user_id]
     );
 
-    await logActivity(user.user_id, 'RESET_PASSWORD', `${user.username} reset their password`);
+    await logActivity(user.user_id, 'RESET_PASSWORD', `${user.username} reset their password via verification code`);
 
-    res.json({ message: 'Password updated. You can now log in with your new password.' });
+    res.json({ message: 'Password updated successfully. You can now sign in with your new password.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error while resetting password.' });

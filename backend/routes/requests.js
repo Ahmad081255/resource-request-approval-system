@@ -14,7 +14,9 @@ router.get('/', async (req, res) => {
       SELECT rq.*, 
              COALESCE(rq.request_date, rq.created_at) AS request_date,
              COALESCE(rq.created_at, rq.request_date) AS created_at,
-             u.full_name AS requester_name, d.department_name
+             u.full_name AS requester_name, d.department_name,
+             (SELECT a.remarks FROM approvals a WHERE a.request_id = rq.request_id ORDER BY a.approval_id DESC LIMIT 1) AS latest_remarks,
+             (SELECT u2.full_name FROM approvals a JOIN users u2 ON a.approver_id = u2.user_id WHERE a.request_id = rq.request_id ORDER BY a.approval_id DESC LIMIT 1) AS latest_approver_name
       FROM requests rq
       JOIN users u ON rq.user_id = u.user_id
       LEFT JOIN departments d ON u.department_id = d.department_id
@@ -118,6 +120,73 @@ router.post('/', authorize('Staff', 'Manager', 'Administrator'), async (req, res
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to submit request.' });
+  }
+});
+
+// PUT /api/requests/:id -- Requester modifies and resubmits a request marked for modification
+router.put('/:id', async (req, res) => {
+  const { resource_type, resource_id, quantity, purpose } = req.body;
+  const qty = Number(quantity);
+
+  if (!resource_type || !purpose || !Number.isFinite(qty) || qty < 1) {
+    return res.status(400).json({ error: 'Resource type, valid quantity (>= 1), and purpose are required.' });
+  }
+
+  try {
+    const [reqRows] = await pool.query('SELECT * FROM requests WHERE request_id = ?', [req.params.id]);
+    if (reqRows.length === 0) return res.status(404).json({ error: 'Request not found.' });
+
+    const existing = reqRows[0];
+    if (existing.user_id !== req.user.user_id) {
+      return res.status(403).json({ error: 'You can only modify your own requests.' });
+    }
+    if (!['modification_requested', 'pending'].includes(existing.status)) {
+      return res.status(400).json({ error: 'Only pending requests or requests marked for modification can be edited.' });
+    }
+
+    await pool.query(
+      `UPDATE requests
+       SET resource_type = ?, resource_id = ?, quantity = ?, purpose = ?, status = 'pending'
+       WHERE request_id = ?`,
+      [resource_type.trim(), resource_id || null, qty, purpose.trim(), req.params.id]
+    );
+
+    // Notify active managers/administrators that the request was modified and resubmitted
+    const [approvers] = await pool.query(
+      `SELECT u.user_id, u.full_name, u.email FROM users u JOIN roles r ON u.role_id = r.role_id
+       WHERE r.role_name IN ('Manager', 'Administrator') AND u.status = 'active'`
+    );
+    const appUrl = `${req.protocol}://${req.get('host')}`;
+    for (const a of approvers) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, request_id, type, message) VALUES (?, ?, 'request_submitted', ?)`,
+        [
+          a.user_id,
+          req.params.id,
+          `${req.user.full_name} modified and resubmitted Request #${req.params.id} (${qty} x ${resource_type.trim()}).`
+        ]
+      );
+
+      const targetEmail = a.email || `${a.full_name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@miva.edu.ng`;
+      sendNewRequestEmail({
+        approverEmail: targetEmail,
+        approverName: a.full_name,
+        requesterName: req.user.full_name,
+        requesterDepartment: req.user.department_name,
+        resourceType: resource_type.trim(),
+        quantity: qty,
+        purpose: `[Modified & Resubmitted] ${purpose.trim()}`,
+        requestId: req.params.id,
+        appUrl
+      }).catch(err => console.error('[Email Notification Error]:', err.message));
+    }
+
+    await logActivity(req.user.user_id, 'RESUBMIT_REQUEST', `Modified & resubmitted Request #${req.params.id} (${qty} x ${resource_type.trim()})`);
+
+    res.json({ message: 'Request modified and resubmitted for approval.', request_id: Number(req.params.id) });
+  } catch (err) {
+    console.error('[Modify Request Error]:', err);
+    res.status(500).json({ error: 'Failed to update and resubmit request.' });
   }
 });
 

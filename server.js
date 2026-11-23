@@ -2,7 +2,22 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const _preservedEmailEnv = {
+  SMTP_HOST: process.env.SMTP_HOST,
+  SMTP_PORT: process.env.SMTP_PORT,
+  SMTP_SECURE: process.env.SMTP_SECURE,
+  SMTP_USER: process.env.SMTP_USER,
+  SMTP_PASS: process.env.SMTP_PASS,
+  EMAIL_FROM: process.env.EMAIL_FROM,
+  MAILTRAP_HOST: process.env.MAILTRAP_HOST,
+  MAILTRAP_PORT: process.env.MAILTRAP_PORT,
+  MAILTRAP_USER: process.env.MAILTRAP_USER,
+  MAILTRAP_PASS: process.env.MAILTRAP_PASS
+};
 require('dotenv').config({ path: path.resolve(__dirname, '.env'), override: true });
+for (const [k, v] of Object.entries(_preservedEmailEnv)) {
+  if (v !== undefined && v !== '') process.env[k] = v;
+}
 
 const authRoutes = require('./backend/routes/auth');
 const requestRoutes = require('./backend/routes/requests');
